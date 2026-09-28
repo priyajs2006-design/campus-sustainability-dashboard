@@ -1,0 +1,228 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Campus Sustainability Dashboard - DEMO</title>
+  <meta name="description" content="Campus Sustainability Dashboard (DEMO DATA). Sample baseline metrics for energy, water, waste, carbon and campus operations." />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ==================== top navigation ==================== -->
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="#dashboard">
+        <svg class="brand-mark" viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">
+          <path fill="none" stroke="currentColor" stroke-width="1.8"
+            d="M12 3 4.2 19.5h15.6L12 3z" />
+          <path fill="currentColor" d="M12 7l-.9 6h1.8L12 7z" />
+          <rect x="11.2" y="14.5" width="1.6" height="2.2" fill="currentColor" />
+        </svg>
+        <span class="brand-text">Campus <b>Sustainability</b></span>
+        <span class="demo-tag">DEMO</span>
+      </a>
+
+      <nav class="nav" id="navMain" aria-label="Primary"></nav>
+
+      <div class="top-actions">
+        <div class="readout" id="clockReadout" title="Clock and connected status">
+          <span class="clock" id="clockNow">--:--</span>
+          <span class="readout-sep">/</span>
+          <span class="status-chip ok" id="connChip">Demo</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ==================== shell ==================== -->
+  <div class="shell">
+    <aside class="sidebar" id="sidebarNav" aria-label="Sections"></aside>
+
+    <main class="content" id="viewRoot">
+
+      <!-- dashboard -->
+      <section class="view" id="viewDashboard"></section>
+
+      <!-- energy -->
+      <section class="view" id="viewEnergy"></section>
+
+      <!-- water -->
+      <section class="view" id="viewWater"></section>
+
+      <!-- waste -->
+      <section class="view" id="viewWaste"></section>
+
+      <!-- carbon -->
+      <section class="view" id="viewCarbon"></section>
+
+      <!-- transportation -->
+      <section class="view" id="viewTransportation"></section>
+
+      <!-- monitoring -->
+      <section class="view" id="viewMonitoring"></section>
+
+      <!-- alerts -->
+      <section class="view" id="viewAlerts"></section>
+
+      <!-- reports -->
+      <section class="view" id="viewReports"></section>
+
+    </main>
+  </div>
+
+  <footer class="footer">
+    <span>Campus Sustainability Dashboard &#183; DEMO DATA &#183; sample baseline &#8212; not live readings</span>
+    <span class="footer-right" id="footerClock"></span>
+  </footer>
+
+  <!-- ==================== scripts ==================== -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/services.js"></script>
+  <script src="js/components.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/monitoring.js"></script>
+  <script src="js/alerts.js"></script>
+  <script src="js/views.js"></script>
+  <script src="js/reports.js"></script>
+
+  <script>
+  /* ============================================================
+     app boot: nav construction, hash router, clock, DEMO banner.
+     Runs after js/ modules register App.views.* / App.services.*
+     ============================================================ */
+  (function () {
+    "use strict";
+
+    var App = (window.SustainabilityApp = window.SustainabilityApp || {});
+    var VIEWS = {
+      dashboard:      { label: "Dashboard",      fn: null },
+      energy:         { label: "Energy",         fn: null },
+      water:          { label: "Water",          fn: null },
+      waste:          { label: "Waste",          fn: null },
+      carbon:         { label: "Carbon",         fn: null },
+      transportation: { label: "Transportation", fn: null },
+      monitoring:     { label: "Monitoring",     fn: null },
+      alerts:         { label: "Alerts",         fn: null },
+      reports:        { label: "Reports",        fn: null }
+    };
+    var CURRENT = null;
+
+    /* ---- resolve each view's render function from registered modules ---- */
+    for (var key in VIEWS) {
+      if (Object.prototype.hasOwnProperty.call(VIEWS, key)) {
+        var vFn = (App.views && App.views[key]) ? App.views[key] : null;
+        VIEWS[key].fn = vFn;
+      }
+    }
+
+    /* ---- helpers ---- */
+    function currentHash() {
+      var h = window.location.hash || "";
+      return h.replace(/^#\/?/, "").split(/[/?]/)[0] || "dashboard";
+    }
+
+    function makeNavItem(key) {
+      var v = VIEWS[key];
+      var a = document.createElement("a");
+      a.href = "#" + v.hashKey;
+      a.className = "nav-link" + (key === CURRENT ? " active" : "");
+      a.textContent = v.label;
+      a.setAttribute("data-view", key);
+      return a;
+    }
+
+    function paintNav() {
+      var nav = document.getElementById("navMain");
+      var side = document.getElementById("sidebarNav");
+      if (nav) nav.innerHTML = "";
+      if (side) side.innerHTML = "";
+      for (var key in VIEWS) {
+        if (!Object.prototype.hasOwnProperty.call(VIEWS, key)) continue;
+        var item = makeNavItem(key);
+        if (nav) nav.appendChild(item.cloneNode(true));
+        if (side) side.appendChild(item);
+      }
+    }
+
+    function activate(viewKey, push) {
+      var key = VIEWS[viewKey] ? viewKey : "dashboard";
+      if (push !== false) window.location.hash = "#" + key;
+
+      var had = (App.views && App.views[key]);
+      var target = document.getElementById("view" + cap(key));
+      if (target) {
+        /* hide every view, show only this one */
+        var all = document.querySelectorAll(".content > .view");
+        for (var i = 0; i < all.length; i++) all[i].classList.remove("active");
+        target.classList.add("active");
+        CURRENT = key;
+
+        /* route to the registered module, else DEMO placeholder */
+        if (had && typeof had === "function") {
+          had();
+        } else {
+          var ph = document.createElement("div");
+          ph.className = "throwaway-card";
+          ph.textContent = "[" + key + "] module not registered yet - DEMO placeholder.";
+          target.appendChild(ph);
+        }
+      }
+      paintNav();
+      window.scrollTo(0, 0);
+    }
+
+    function cap(s) {
+      return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+    }
+
+    function tickClock() {
+      var el = document.getElementById("clockNow");
+      var fc = document.getElementById("footerClock");
+      var now = new Date();
+      var hh = pad(now.getHours());
+      var mm = pad(now.getMinutes());
+      var ss = pad(now.getSeconds());
+      var stamp = hh + ":" + mm + ":" + ss;
+      if (el) el.textContent = stamp;
+      if (fc) fc.textContent = now.toDateString() + " " + stamp;
+    }
+
+    function pad(n) {
+      return n < 10 ? "0" + n : String(n);
+    }
+
+    /* ---- DEMO strip injected at bottom of every view area once ---- */
+    function injectDemoBanner() {
+      var root = document.getElementById("viewRoot");
+      if (!root || root.querySelector(".demo-banner")) return;
+      var b = document.createElement("div");
+      b.className = "demo-banner";
+      b.innerHTML =
+        '<span class="demo-badge">DEMO</span> ' +
+        "All metrics on this dashboard are <b>sample baseline data</b> for demonstration. " +
+        "No live sensors or backend readings are connected.";
+      root.appendChild(b);
+    }
+
+    /* ---- events ---- */
+    window.addEventListener("hashchange", function () {
+      activate(currentHash(), false);
+    });
+
+    document.addEventListener("click", function (e) {
+      var a = e.target && e.target.closest ? e.target.closest("a[data-view]") : null;
+      if (a && a.getAttribute("data-view") === CURRENT) e.preventDefault();
+    });
+
+    /* ---- boot ---- */
+    paintNav();
+    injectDemoBanner();
+    activate(currentHash(), false);
+    tickClock();
+    window.setInterval(tickClock, 1000);
+  })();
+  </script>
+</body>
+</html>
